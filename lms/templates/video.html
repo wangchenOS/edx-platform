@@ -1,4 +1,5 @@
 <%! from django.utils.translation import ugettext as _ %>
+<%! from django.conf import settings %>
 
 % if display_name is not UNDEFINED and display_name is not None:
     <h2>${display_name}</h2>
@@ -16,6 +17,9 @@
     data-sources='${sources}'
     data-save-state-url="${ajax_url}"
     data-caption-data-dir="${data_dir}"
+    % if settings.FEATURES.get('CREATIVE_COMMONS_LICENSING', False) and licensable and video_license:
+        data-license="${video_license}"
+    % endif
     data-show-captions="${show_captions}"
     data-general-speed="${general_speed}"
     data-speed="${speed}"
@@ -96,6 +100,12 @@
       <ol id="transcript-captions" class="subtitles" tabindex="0" role="group" aria-label="${_('Activating an item in this group will spool the video to the corresponding time point. To skip transcript, go to previous item.')}">
         <li></li>
       </ol>
+
+      % if settings.FEATURES.get('CREATIVE_COMMONS_LICENSING', False) and video_license:
+        <div class="xmodule_licensable license">
+          ${video_license.html}
+        </div>
+      % endif
     </div>
 
     <a class="nav-skip sr" id="after-transcript_${id}" href="#before-transcript_${id}">${_('Go back to start of transcript.')}</a>

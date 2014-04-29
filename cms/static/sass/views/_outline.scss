@@ -178,12 +178,17 @@
   .course-status {
     margin-bottom: $baseline;
 
-    .status-release {
+    .status-release, .course-license {
       @extend %t-copy-base;
       display: inline-block;
       color: $color-copy-base;
     }
+    .course-license {
+      display: block;
+    }
 
+    .course-license-label,
+    .xmodule_licensable,
     .status-release-label,
     .status-release-value,
     .status-actions {
@@ -192,6 +197,7 @@
       margin-bottom: 0;
     }
 
+    .course-license-label,
     .status-release-label {
       margin-right: ($baseline/4);
     }
@@ -208,8 +214,8 @@
     }
 
     // STATE: hover
-    &:hover {
-
+    .course-license:hover,
+    .status-release:hover {
       .status-actions {
         opacity: 1.0;
       }

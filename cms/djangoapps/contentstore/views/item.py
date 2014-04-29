@@ -18,6 +18,7 @@ from django.contrib.auth.decorators import login_required
 from django.http import HttpResponseBadRequest, HttpResponse, Http404
 from django.utils.translation import ugettext as _
 from django.views.decorators.http import require_http_methods
+from django.conf import settings
 
 from xblock.fields import Scope
 from xblock.fragment import Fragment
@@ -30,6 +31,7 @@ from xmodule.modulestore.exceptions import ItemNotFoundError, InvalidLocationErr
 from xmodule.modulestore.inheritance import own_metadata
 from xmodule.modulestore.draft_and_published import DIRECT_ONLY_CATEGORIES
 from xmodule.x_module import PREVIEW_VIEWS, STUDIO_VIEW, STUDENT_VIEW
+from xmodule.license import License
 
 from xmodule.course_module import DEFAULT_START_DATE
 from django.contrib.auth.models import User
@@ -478,6 +480,22 @@ def _create_item(request):
 
         if display_name is not None:
             metadata['display_name'] = display_name
+
+        if settings.FEATURES.get("CREATIVE_COMMONS_LICENSING", False):
+            # If licensing is enabled, check if the course that contains the item is licensable
+            course = store.get_course(dest_usage_key.course_key)
+            metadata['licensable'] = False
+            metadata['license'] = None
+            # Get the metadata, check if the course is licensable
+            if course is not None and course.licensable:
+                metadata['licensable'] = True
+                # If we were supplied a license for the item, set it
+                request_license = request.json.get('license')
+                if request_license is not None:
+                    metadata['license'] = request_license
+                else:
+                    # Otherwise set the course license as the license for the item
+                    metadata['license'] = License().to_json(course.license)
 
         # TODO need to fix components that are sending definition_data as strings, instead of as dicts
         # For now, migrate them into dicts here.

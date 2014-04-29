@@ -100,6 +100,23 @@ from contentstore.utils import reverse_usage_url
                       </li>
                     </ul>
                 </div>
+                % if settings.FEATURES.get('CREATIVE_COMMONS_LICENSING', False) and course_content_license:
+                  <div class="course-license">
+                      <h2 class="course-license-label">${_("Course Content License:")}</h2>
+                      <div class="xmodule_licensable license">
+                        ${course_content_license.html}
+                      </div>
+
+                      <ul class="status-actions">
+                        <li class="action-item action-edit">
+                          <a href="${settings_url}" class="edit-button action-button" data-tooltip="${_("Edit Course Content License")}">
+                              <i class="icon-pencil"></i>
+                              <span class="action-button-text sr">${_("Edit Course Content License")}</span>
+                          </a>
+                        </li>
+                      </ul>
+                  </div>
+                % endif
             </div>
 
             <div class="wrapper-dnd">

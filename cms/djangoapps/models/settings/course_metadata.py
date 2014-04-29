@@ -33,6 +33,7 @@ class CourseMetadata(object):
         'tags',  # from xblock
         'visible_to_staff_only',
         'group_access',
+        'license',
     ]
 
     @classmethod
@@ -62,6 +63,10 @@ class CourseMetadata(object):
                 continue
 
             if field.name in cls.filtered_list():
+                continue
+
+            # The licensable field should only be in the course settings if licensing is enabled globally.
+            if field.name is 'licensable' and not settings.FEATURES.get('CREATIVE_COMMONS_LICENSING', False):
                 continue
 
             result[field.name] = {

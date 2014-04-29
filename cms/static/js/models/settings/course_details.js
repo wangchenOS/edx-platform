@@ -1,10 +1,11 @@
-define(["backbone", "underscore", "gettext"], function(Backbone, _, gettext) {
+define(["backbone", "underscore", "gettext", "js/models/license", "backbone.associations"], function(Backbone, _, gettext, License) {
 
-var CourseDetails = Backbone.Model.extend({
+var CourseDetails = Backbone.AssociatedModel.extend({
     defaults: {
         org : '',
         course_id: '',
         run: '',
+        license: {},
         start_date: null,	// maps to 'start'
         end_date: null,		// maps to 'end'
         enrollment_start: null,
@@ -17,6 +18,12 @@ var CourseDetails = Backbone.Model.extend({
         course_image_name: '', // the filename
         course_image_asset_path: '' // the full URL (/c4x/org/course/num/asset/filename)
     },
+
+    relations: [{
+        type: Backbone.One,
+        key: 'license',
+        relatedModel: License
+    }],
 
     validate: function(newattrs) {
         // Returns either nothing (no return call) so that validate works or an object of {field: errorstring} pairs

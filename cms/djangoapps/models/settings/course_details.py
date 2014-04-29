@@ -9,6 +9,7 @@ from xmodule.modulestore.exceptions import ItemNotFoundError
 from contentstore.utils import course_image_url
 from models.settings import course_grading
 from xmodule.fields import Date
+from xmodule.license import parse_license, License
 from xmodule.modulestore.django import modulestore
 
 # This list represents the attribute keys for a course's 'about' info.
@@ -28,6 +29,7 @@ class CourseDetails(object):
         self.org = org
         self.course_id = course_id
         self.run = run
+        self.license = None
         self.start_date = None  # 'start'
         self.end_date = None  # 'end'
         self.enrollment_start = None
@@ -60,6 +62,7 @@ class CourseDetails(object):
         descriptor = modulestore().get_course(course_key)
         course_details = cls(course_key.org, course_key.course, course_key.run)
 
+        course_details.license = descriptor.license
         course_details.start_date = descriptor.start
         course_details.end_date = descriptor.end
         course_details.enrollment_start = descriptor.enrollment_start
@@ -155,6 +158,10 @@ class CourseDetails(object):
             descriptor.course_image = jsondict['course_image_name']
             dirty = True
 
+        if 'license' in jsondict:
+            descriptor.license = parse_license(jsondict['license'])
+            dirty = True
+
         if dirty:
             module_store.update_item(descriptor, user.id)
 
@@ -204,7 +211,7 @@ class CourseDetails(object):
 # TODO move to a more general util?
 class CourseSettingsEncoder(json.JSONEncoder):
     """
-    Serialize CourseDetails, CourseGradingModel, datetime, and old Locations
+    Serialize CourseDetails, CourseGradingModel, datetime, licenses, and old Locations
     """
     def default(self, obj):
         if isinstance(obj, (CourseDetails, course_grading.CourseGradingModel)):
@@ -213,5 +220,7 @@ class CourseSettingsEncoder(json.JSONEncoder):
             return obj.dict()
         elif isinstance(obj, datetime.datetime):
             return Date().to_json(obj)
+        elif isinstance(obj, License):
+            return obj.to_json(obj)
         else:
             return JSONEncoder.default(self, obj)
