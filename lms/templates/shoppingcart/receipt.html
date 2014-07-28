@@ -39,7 +39,7 @@ from courseware.courses import course_image_url, get_course_about_section, get_c
                   receipient_emails=u"<strong>{receipient_emails}</strong>".format(
                     receipient_emails=appended_recipient_emails
                   ),
-            )}
+            ) | n}
           </span>
         % elif order_type == 'business':
           ${ungettext(
@@ -51,12 +51,24 @@ from courseware.courses import course_image_url, get_course_about_section, get_c
             course_names=u"<b>{course_names}</b>".format(
               course_names=appended_course_names
             )
-          )}
+          ) | n}
           ${_("The following receipt has been emailed to {receipient_emails}").format(
             receipient_emails=u"<strong>{receipient_emails}</strong>".format(
               receipient_emails=appended_recipient_emails,
             )
-          )}
+          ) | n}
+          <span class="mt-7">${_("You have successfully been enrolled for <b>{appended_course_names}</b>. The following receipt has been emailed to"
+          " <strong>{appended_recipient_emails}</strong></span>").format(appended_course_names=appended_course_names, appended_recipient_emails=appended_recipient_emails) | n}
+        % elif order_type == 'business':
+          % if total_registration_codes > 1 :
+            <% code_plural_form = 'codes' %>
+          % else:
+            <% code_plural_form = 'code' %>
+          % endif
+          ${_("You have successfully purchased <b>{total_registration_codes} course registration codes</b> "
+          "for <b>{appended_course_names}. </b>"
+           "The following receipt has been emailed to <strong>{appended_recipient_emails}</strong>"
+           ).format(total_registration_codes=total_registration_codes, appended_course_names=appended_course_names, appended_recipient_emails=appended_recipient_emails) | n}
         % endif
 
       </div>

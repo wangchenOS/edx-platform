@@ -390,7 +390,7 @@ function goto( mode)
 ##-----------------------------------------------------------------------------
 
 %if msg:
-    <p></p><p id="idash_msg">${msg}</p>
+    <p></p><p id="idash_msg">${msg | n}</p>
 %endif
 
 ##-----------------------------------------------------------------------------
@@ -464,7 +464,7 @@ function goto( mode)
     <%namespace name="all_section_metrics" file="/class_dashboard/all_section_metrics.js"/>
 
     <script>
-      ${d3_stacked_bar_graph.body()}
+      ${d3_stacked_bar_graph.body() | n}
     </script>
 
     <div id="metrics"></div>
