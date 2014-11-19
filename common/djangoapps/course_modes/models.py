@@ -155,6 +155,26 @@ class CourseMode(models.Model):
         return modes
 
     @classmethod
+    def create_course_mode(cls, course_id, min_price, mode_slug, currency, mode_display_name=DEFAULT_MODE_SLUG):
+        """
+        Create and returns the CourseMode object
+        """
+        modes = cls.modes_for_course(course_id)
+        matched = [m for m in modes if m.slug == mode_slug]
+        if matched:
+            course_mode = cls(
+                course_id=course_id,
+                min_price=min_price,
+                mode_slug=mode_slug,
+                mode_display_name=mode_display_name,
+                currency=currency
+            )
+            course_mode.save()
+            return course_mode
+        else:
+            return None
+
+    @classmethod
     def modes_for_course_dict(cls, course_id, modes=None):
         """Returns the non-expired modes for a particular course.
 
