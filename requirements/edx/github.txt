@@ -36,8 +36,8 @@ git+https://github.com/mitocw/django-cas.git@60a5b8e5a62e63e0d5d224a87f0b489201a
 -e git+https://github.com/edx/edx-oauth2-provider.git@0.4.0#egg=oauth2-provider
 -e git+https://github.com/edx/edx-val.git@ba00a5f2e0571e9a3f37d293a98efe4cbca850d5#egg=edx-val
 -e git+https://github.com/pmitros/RecommenderXBlock.git@b41ba8778b98da0ea680ffb8bbc59492d669df2d#egg=recommender-xblock
--e git+https://github.com/edx-solutions/edx-search.git@670a1afcb9a3b6c5cfc1b21e7d15f395ea4fd7f0#egg=edx-search
+-e git+https://github.com/edx-solutions/edx-search.git@1043a6d17ae5a4582050ffacbf79fac3f7c9f47b#egg=edx-search
 
 # XBlocks
 -e git+https://github.com/edx-solutions/xblock-utils.git#egg=xblock-utils
--e git+https://github.com/edx-solutions/xblock-google-drive.git@119341d379bd9b7869192a9fe7986ee3cd30c2e1#egg=xblock-google-drive
+-e git+https://github.com/edx-solutions/xblock-google-drive.git@6c78f0a99f92a45c0e89935fc5d204312503eca1#egg=xblock-google-drive
