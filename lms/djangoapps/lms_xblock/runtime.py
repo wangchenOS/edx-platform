@@ -219,7 +219,7 @@ class LmsModuleSystem(LmsHandlerUrls, ModuleSystem):  # pylint: disable=abstract
             extra_data['request-token'] = self.request_token
 
         return self._wrap_ele(
-            aside,
+            # aside,
             view,
             frag,
             extra_data,
