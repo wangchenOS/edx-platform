@@ -482,6 +482,10 @@
                     'js/verify_student/views/enrollment_confirmation_step_view'
                 ]
             },
+            'js/search/views/form': {
+                exports: 'edx.search.Form',
+                deps: ['jquery', 'underscore', 'backbone']
+            }
         }
     });
 
@@ -508,6 +512,7 @@
         'lms/include/js/spec/verify_student/webcam_photo_view_spec.js',
         'lms/include/js/spec/verify_student/review_photos_step_view_spec.js',
         'lms/include/js/spec/verify_student/make_payment_step_view_spec.js'
+        'lms/include/js/spec/search/search_spec.js'
     ]);
 
 }).call(this, requirejs, define);
