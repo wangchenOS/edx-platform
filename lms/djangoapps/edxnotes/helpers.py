@@ -27,6 +27,8 @@ from provider.utils import now
 from .exceptions import EdxNotesParseError, EdxNotesServiceUnavailable
 
 log = logging.getLogger(__name__)
+HIGHLIGHT_TAG = "span"
+HIGHLIGHT_CLASS = "note-highlight"
 
 
 class NoteJSONEncoder(JSONEncoder):
@@ -72,7 +74,7 @@ def get_token_url(course_id):
     })
 
 
-def send_request(user, course_id, path="", query_string=""):
+def send_request(user, course_id, path="", query_string=None):
     """
     Sends a request with appropriate parameters and headers.
     """
@@ -85,6 +87,9 @@ def send_request(user, course_id, path="", query_string=""):
     if query_string:
         params.update({
             "text": query_string,
+            "highlight": True,
+            "highlight_tag": HIGHLIGHT_TAG,
+            "highlight_class": HIGHLIGHT_CLASS,
         })
 
     try:

@@ -655,6 +655,9 @@ class EdxNotesHelpersTest(ModuleStoreTestCase):
                 "user": "anonymous_id",
                 "course_id": unicode(self.course.id),
                 "text": "text",
+                "highlight": True,
+                "highlight_tag": "span",
+                "highlight_class": "note-highlight",
             }
         )
 
