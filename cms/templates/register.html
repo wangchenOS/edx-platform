@@ -1,7 +1,9 @@
-<%! from util.markup import HTML, ugettext as _ %>
 <%inherit file="base.html" />
 <%def name="online_help_token()"><% return "register" %></%def>
-<%! from django.core.urlresolvers import reverse %>
+<%!
+from django.core.urlresolvers import reverse
+from util.markup import HTML, ugettext as _
+%>
 
 <%block name="title">${_("Sign Up")}</%block>
 <%block name="bodyclass">not-signedin view-signup</%block>

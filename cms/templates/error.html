@@ -1,6 +1,8 @@
-<%! from util.markup import HTML, ugettext as _ %>
 <%inherit file="base.html" />
-<%! from django.core.urlresolvers import reverse %>
+<%!
+from django.core.urlresolvers import reverse
+from util.markup import HTML, ugettext as _
+%>
 <%block name="bodyclass">error</%block>
 <%block name="title">
   % if error == '404':

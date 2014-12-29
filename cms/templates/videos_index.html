@@ -1,8 +1,9 @@
 <%inherit file="base.html" />
 <%!
-  import json
-  from django.core.serializers.json import DjangoJSONEncoder
-  from django.utils.translation import ugettext as _
+import json
+from django.core.serializers.json import DjangoJSONEncoder
+from django.utils.translation import ugettext as _
+from util.markup import HTML
 %>
 <%block name="title">${_("Video Uploads")}</%block>
 <%block name="bodyclass">is-signedin course view-uploads view-video-uploads</%block>

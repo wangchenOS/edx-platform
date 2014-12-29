@@ -1,8 +1,8 @@
 <%inherit file="base.html" />
 <%def name="online_help_token()"><% return "group_configurations" %></%def>
 <%namespace name='static' file='static_content.html'/>
-<%! import json %>
 <%!
+  import json
   from contentstore import utils
   from util.markup import HTML, ugettext as _
   from django.template.defaultfilters import escapejs

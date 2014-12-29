@@ -1,8 +1,10 @@
-<%! from util.markup import HTML, ugettext as _ %>
-<%! from django.core.urlresolvers import reverse %>
+<%inherit file="../main.html" />
+<%!
+from util.markup import HTML, ugettext as _
+from django.core.urlresolvers import reverse
+%>
 <%namespace name='static' file='../static_content.html'/>
 
-<%inherit file="../main.html" />
 
 <%block name="title"><title>${_("Contact {platform_name}").format(platform_name=settings.PLATFORM_NAME)}</title></%block>
 
