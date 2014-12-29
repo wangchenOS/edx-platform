@@ -1622,3 +1622,48 @@ class Donation(OrderItem):
             data['name'] = settings.PLATFORM_NAME
             data['category'] = settings.PLATFORM_NAME
         return data
+
+CYBERSOURCE_TRANSACTION_TYPE_PURCHASE = "ics_bill"
+CYBERSOURCE_TRANSACTION_TYPE_REFUND = "ics_credit"
+
+class CyberSourceTransaction(models.Model):
+    """
+    This model will act as a copy of all transaction information that is stored on CyberSource. We
+    have a syncronization management command to extract all of the daily reports and store
+    locally in our database
+    """
+
+    # trans_ref_no is a CyberSource identifier representing the transaction
+    # let's treat this as a primary key to facilitate simple lookups
+    trans_ref_no = models.BigIntegerField(primary_key=True, db_index=True)
+
+    batch_id = models.BigIntegerField()
+
+    # index the merchant_id to facilitate reporting by merchant_id
+    merchant_id = models.CharField(max_length=64, db_index=True)
+    batch_date = models.DateTimeField()
+    request_id = models.CharField(max_length=64)
+
+    # NOTE: merchant_ref_number in the CyberSource report = Invoice.id
+    # so let's store it as a ForeignKey
+    order = models.ForeignKey(Invoice, db_index=True)
+
+    payment_method = models.CharField(max_length=64)
+    currency = models.CharField(max_length=16)
+    amount = models.DecimalField(decimal_places=2, max_digits=30)
+
+    # transaction_type in CyberSource report is
+    # whether it is a purchase or a refund: 'ics_bill' or 'ics_credit'
+    transaction_type = models.CharField(max_length=16, db_index=True)
+
+
+class CyberSourceTransactionSynchronization(TimeStampedModel):
+    """
+    This model will store all synchronization activities when synchronizing the internal database
+    with CyberSource reporting. This table is managed by the synchronization management
+    command
+    """
+
+    extract_range_start = models.DateTimeField(db_index=True)
+    extract_range_end = models.DateTimeField(db_index=True)
+    rows_extracted = models.IntegerField()
