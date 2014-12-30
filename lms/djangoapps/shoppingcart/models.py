@@ -1623,8 +1623,6 @@ class Donation(OrderItem):
             data['category'] = settings.PLATFORM_NAME
         return data
 
-CYBERSOURCE_TRANSACTION_TYPE_PURCHASE = "ics_bill"
-CYBERSOURCE_TRANSACTION_TYPE_REFUND = "ics_credit"
 
 class CyberSourceTransaction(models.Model):
     """
@@ -1633,8 +1631,14 @@ class CyberSourceTransaction(models.Model):
     locally in our database
     """
 
+    TRANSACTION_TYPE_PURCHASE = "ics_bill"
+    TRANSACTION_TYPE_REFUND = "ics_credit"
+
     # trans_ref_no is a CyberSource identifier representing the transaction
-    # let's add a index to facilitate simple lookups
+    # let's add a index to facilitate simple lookups. Note that we
+    # are not using this as the primary key because we want to have
+    # a auto-incrementing counter that are recorded in the
+    # CyberSourceTransactionSynchronization table
     trans_ref_no = models.BigIntegerField(db_index=True)
 
     # batch_id appears to be an identifier which represents a batch of transactions
@@ -1661,6 +1665,19 @@ class CyberSourceTransaction(models.Model):
     # transaction_type in CyberSource report is
     # whether it is a purchase or a refund: 'ics_bill' or 'ics_credit'
     transaction_type = models.CharField(max_length=16, db_index=True)
+
+
+class CyberSourceTransactionCourseMap(models.Model):
+    """
+    This table is to facilitate quick querying for financial reporting.
+    While this table does not expose any new information, it is non-performant to
+    map CyberSource transactions to CourseId's via the existing Order and OrderItem subclasses.
+    These are computed during synchronization-time to allow for quicker querying
+    """
+
+    transaction = models.ForeignKey(CyberSourceTransaction)
+    course_id = CourseKeyField(max_length=255, db_index=True)
+    order_item = models.ForeignKey(OrderItem)
 
 
 class CyberSourceTransactionSynchronization(TimeStampedModel):
