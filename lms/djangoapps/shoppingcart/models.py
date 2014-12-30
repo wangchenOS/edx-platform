@@ -1634,21 +1634,27 @@ class CyberSourceTransaction(models.Model):
     """
 
     # trans_ref_no is a CyberSource identifier representing the transaction
-    # let's treat this as a primary key to facilitate simple lookups
-    trans_ref_no = models.BigIntegerField(primary_key=True, db_index=True)
+    # let's add a index to facilitate simple lookups
+    trans_ref_no = models.BigIntegerField(db_index=True)
 
+    # batch_id appears to be an identifier which represents a batch of transactions
+    # that CyberSource performs settlement at the same time
     batch_id = models.BigIntegerField()
 
     # index the merchant_id to facilitate reporting by merchant_id
     merchant_id = models.CharField(max_length=64, db_index=True)
     batch_date = models.DateTimeField()
+
+    # not sure what request_id is, but it is a very large exponential number/string
     request_id = models.CharField(max_length=64)
 
     # NOTE: merchant_ref_number in the CyberSource report = Invoice.id
     # so let's store it as a ForeignKey
     order = models.ForeignKey(Invoice, db_index=True)
 
+    # Visa, MasterCard, etc.
     payment_method = models.CharField(max_length=64)
+
     currency = models.CharField(max_length=16)
     amount = models.DecimalField(decimal_places=2, max_digits=30)
 
@@ -1664,6 +1670,14 @@ class CyberSourceTransactionSynchronization(TimeStampedModel):
     command
     """
 
-    extract_range_start = models.DateTimeField(db_index=True)
-    extract_range_end = models.DateTimeField(db_index=True)
+    # start date of extract (daily only)
+    date_range_start = models.DateTimeField(db_index=True)
+
+    # end date of extract
+    date_range_end = models.DateTimeField(db_index=True)
+
     rows_extracted = models.IntegerField()
+
+    # the start and end Id numbers of the corresponding rows in CyberSourceTransaction
+    start_transaction_id = models.IntegerField()
+    end_transaction_id = models.IntegerField()
