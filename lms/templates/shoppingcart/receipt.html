@@ -31,30 +31,32 @@ from courseware.courses import course_image_url, get_course_about_section, get_c
           <% dashboard_url = reverse('dashboard') %>
           <a href="${dashboard_url}" class="blue pull-right">${_("View Dashboard")} <i class="icon-caret-right"></i></a>
           <span class="mt-7">
-            ${_(u"You have successfully been enrolled for {course_names}. "
-                u"The following receipt has been emailed to {receipient_emails}").format(
-                  course_names=HTML("<b>{course_names}</b>").format(
-                    course_names=appended_course_names
-                  ),
-                  receipient_emails=HTML("<strong>{receipient_emails}</strong>").format(
-                    receipient_emails=appended_recipient_emails
-                  ),
+            ${HTML(_(
+                u"You have successfully been enrolled for {course_names}. "
+                u"The following receipt has been emailed to {receipient_emails}"
+              )).format(
+                course_names=HTML("<b>{course_names}</b>").format(
+                  course_names=appended_course_names
+                ),
+                receipient_emails=HTML("<strong>{receipient_emails}</strong>").format(
+                  receipient_emails=appended_recipient_emails
+                ),
             )}
           </span>
         % elif order_type == 'business':
-          ${ungettext(
+          ${HTML(ungettext(
             "You have successfully purchased {em_start}{number} course registration code{em_end} for {course_names}.",
             "You have successfully purchased {em_start}{number} course registration codes{em_end} for {course_names}.",
             total_registration_codes
-          ).format(
+          )).format(
             number=total_registration_codes,
-            course_names=HTML("<b>{course_names}</b>").format(
+            course_names=HTML("<strong>{course_names}</strong>").format(
               course_names=appended_course_names
             ),
-            em_start=HTML("<b>"),
-            em_end=HTML("</b>"),
+            em_start=HTML("<strong>"),
+            em_end=HTML("</strong>"),
           )}
-          ${_("The following receipt has been emailed to {receipient_emails}").format(
+          ${HTML(_("The following receipt has been emailed to {receipient_emails}")).format(
             receipient_emails=HTML("<strong>{receipient_emails}</strong>").format(
               receipient_emails=appended_recipient_emails,
             )
