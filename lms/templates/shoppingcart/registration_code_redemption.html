@@ -1,5 +1,5 @@
 <%!
-from django.utils.translation import ugettext as _
+from util.markup import HTML, ugettext as _
 from django.core.urlresolvers import reverse
 from courseware.courses import course_image_url, get_course_about_section
 %>
@@ -49,8 +49,8 @@ from courseware.courses import course_image_url, get_course_about_section
               "to see if you're enrolled in the course, or contact your "
               "company's administrator."
             ).format(
-              link_start='<a href="{url}">'.format(url=reverse('dashboard')),
-              link_end='</a>',
+              link_start=HTML('<a href="{url}">').format(url=reverse('dashboard')),
+              link_end=HTML('</a>'),
             )}
           </p>
           % elif redemption_success:
@@ -68,8 +68,8 @@ from courseware.courses import course_image_url, get_course_about_section
               "You're already registered for this course. "
               "Visit your {link_start}dashboard{link_end} to see the course."
             ).format(
-              link_start='<a href="{url}">'.format(url=reverse('dashboard')),
-              link_end='</a>',
+              link_start=HTML('<a href="{url}">').format(url=reverse('dashboard')),
+              link_end=HTML('</a>'),
             )}
           </p>
           % else:
@@ -89,11 +89,11 @@ from courseware.courses import course_image_url, get_course_about_section
       </div>
       % if not reg_code_already_redeemed:
         %if redemption_success:
-          <a href="${reverse('dashboard')}" class="link-button course-link-bg-color">${_("View Dashboard &nbsp; &nbsp; &#x25b8;")}</a>
+          <a href="${reverse('dashboard')}" class="link-button course-link-bg-color">${_("View Dashboard")} ▸</a>
         %elif not registered_for_course:
           <form method="post">
             <input type="hidden" name="csrfmiddlewaretoken" value="${ csrf_token }">
-            <input type="submit" value="${_("Activate Course Enrollment")} &#x25b8;"
+            <input type="submit" value="${_("Activate Course Enrollment")} ▸"
                id="id_active_course_enrollment" name="active_course_enrollment">
           </form>
         %endif
