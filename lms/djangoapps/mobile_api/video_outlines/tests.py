@@ -69,6 +69,11 @@ class TestVideoOutline(ModuleStoreTestCase, APITestCase):
             category="vertical",
             display_name=u"split test vertical\u03a9",
         )
+        self.split_test = ItemFactory.create(
+            parent_location=self.split_unit.location,
+            category="split_test",
+            display_name=u"split test unit"
+        )
 
         self.edx_video_id = 'testing-123'
 
@@ -230,11 +235,6 @@ class TestVideoOutline(ModuleStoreTestCase, APITestCase):
         self.assertEqual(course_outline[0]["section_url"], course_outline[0]["unit_url"])
 
     def test_course_list_with_split_test(self):
-        self.split_test = ItemFactory.create(
-            parent_location=self.split_unit.location,
-            category="split_test",
-            display_name=u"split test unit"
-        )
         ItemFactory.create(
             parent_location=self.split_test.location,
             category="video",
@@ -251,7 +251,6 @@ class TestVideoOutline(ModuleStoreTestCase, APITestCase):
         self.assertEqual(len(course_outline[1]["path"]), 4)
         self.assertEqual(course_outline[0]["summary"]["name"], u"split test vertical a")
         self.assertEqual(course_outline[1]["summary"]["name"], u"split test vertical b")
-
 
     def test_course_list_with_hidden_blocks(self):
         hidden_subsection = ItemFactory.create(

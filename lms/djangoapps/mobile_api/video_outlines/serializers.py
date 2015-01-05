@@ -5,7 +5,6 @@ from rest_framework.reverse import reverse
 
 from courseware.access import has_access
 
-
 from edxval.api import (
     get_video_info_for_course_and_profile, ValInternalError
 )
@@ -64,7 +63,7 @@ class BlockOutline(object):
                 block_path.append(block)
 
             block_list = list(reversed(block_path))
-            n = len(block_list)
+            n = len(block_list)  # pylint: disable=C0103
 
             chapter = block_list[1].location.block_id if n > 1 else None
             section = block_list[2] if n > 2 else None
