@@ -12,15 +12,17 @@ import csv
 from courseware.courses import get_course_by_id
 from boto.exception import BotoServerError  # this is a super-class of SESError and catches connection errors
 from django.dispatch import receiver
-from django.db import models
+from django.db import models, IntegrityError
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.mail import send_mail
 from django.contrib.auth.models import User
 from django.utils.translation import ugettext as _
+from django.db.models.signals import post_save
 from django.db import transaction
 from django.db.models import Sum
 from django.core.urlresolvers import reverse
+from django.utils.translation import ugettext_noop
 from model_utils.managers import InheritanceManager
 from model_utils.models import TimeStampedModel
 from django.core.mail.message import EmailMessage
@@ -1624,66 +1626,181 @@ class Donation(OrderItem):
         return data
 
 
-class CyberSourceTransaction(models.Model):
+TRANSACTION_TYPE_PURCHASE = 'p'
+TRANSACTION_TYPE_REFUND = 'r'
+
+
+class PaymentProcessorTransaction(TimeStampedModel):
     """
-    This model will act as a copy of all transaction information that is stored on CyberSource. We
+    This model will act as a copy of all transaction information that is stored on any Payment Processor. We
     have a syncronization management command to extract all of the daily reports and store
     locally in our database
     """
 
-    TRANSACTION_TYPE_PURCHASE = "ics_bill"
-    TRANSACTION_TYPE_REFUND = "ics_credit"
+    # The primary identifier for any transaction as stored in
+    # the payment processor.
+    remote_transaction_id = models.CharField(max_length=64, db_index=True, unique=True)
 
-    # trans_ref_no is a CyberSource identifier representing the transaction
-    # let's add a index to facilitate simple lookups. Note that we
-    # are not using this as the primary key because we want to have
-    # a auto-incrementing counter that are recorded in the
-    # CyberSourceTransactionSynchronization table
-    trans_ref_no = models.BigIntegerField(db_index=True)
+    # any 'account identified' (aka Merchant Account) associated with this transaction
+    # note, this is an optional field
+    account_id = models.CharField(max_length=32, null=True)
 
-    # batch_id appears to be an identifier which represents a batch of transactions
-    # that CyberSource performs settlement at the same time
-    batch_id = models.BigIntegerField()
+    # The timestamp associated with when the payment processing
+    # occured
+    processed_at = models.DateTimeField()
 
-    # index the merchant_id to facilitate reporting by merchant_id
-    merchant_id = models.CharField(max_length=64, db_index=True)
-    batch_date = models.DateTimeField()
-
-    # not sure what request_id is, but it is a very large exponential number/string
-    request_id = models.CharField(max_length=64)
-
-    # NOTE: merchant_ref_number in the CyberSource report = Invoice.id
-    # so let's store it as a ForeignKey
-    order = models.ForeignKey(Invoice, db_index=True)
-
-    # Visa, MasterCard, etc.
-    payment_method = models.CharField(max_length=64)
+    # the Order model that this processing is associated with
+    order = models.ForeignKey(Order, db_index=True)
 
     currency = models.CharField(max_length=16)
     amount = models.DecimalField(decimal_places=2, max_digits=30)
 
-    # transaction_type in CyberSource report is
-    # whether it is a purchase or a refund: 'ics_bill' or 'ics_credit'
-    transaction_type = models.CharField(max_length=16, db_index=True)
+    # transaction_type in Payment Processing report is
+    # whether it is a purchase or a refund: 'purchase' or 'refund'
+    TRANSACTION_TYPE_CHOICES = (
+        (TRANSACTION_TYPE_PURCHASE, ugettext_noop('Purchase')),
+        (TRANSACTION_TYPE_REFUND, ugettext_noop('Refund'))
+    )
+    transaction_type = models.CharField(max_length=6, db_index=True, choices=TRANSACTION_TYPE_CHOICES)
+
+    def __eq__(self, other):
+        """
+        Equality operator
+        """
+
+        return unicode(self.remote_transaction_id) == unicode(other.remote_transaction_id) and \
+            unicode(self.account_id) == unicode(other.account_id) and \
+            self.processed_at == other.processed_at and \
+            self.order.id == other.order.id and \
+            unicode(self.currency) == unicode(other.currency) and \
+            self.amount == other.amount and \
+            self.transaction_type == other.transaction_type
+
+    @classmethod
+    def create(cls, remote_transaction_id, account_id, processed_at, order_id, currency, amount, transaction_type):
+        """
+        This classmethod will create a new entry in the PaymentProcessorTransaction table
+        It will use a get_or_create() at the ORM level. We enforce that a Transaction is immutable and we therefore will
+        not support update cases
+        """
+
+        transaction = PaymentProcessorTransaction(
+            remote_transaction_id=remote_transaction_id,
+            account_id=account_id,
+            processed_at=processed_at,
+            order=Order.objects.get(id=order_id),
+            currency=currency,
+            amount=amount,
+            transaction_type=transaction_type
+        )
+
+        # The basic
+        exists = PaymentProcessorTransaction.objects.filter(remote_transaction_id=remote_transaction_id).exists()
+
+        if exists:
+            # see if an already existing row is *exactly* the same
+            existing = PaymentProcessorTransaction.objects.get(remote_transaction_id=remote_transaction_id)
+
+            if transaction != existing:
+                raise IntegrityError("Attempting to change an existing transaction ({transaction_id}). This is not allowed!".format(transaction_id=remote_transaction_id))
+
+            # if transactions have same data, then we just do nothing
+        else:
+            # this is a new row, so we save
+            transaction.save()
+
+        return transaction
+
+    @classmethod
+    def get_transactions_for_course(cls, course_key, transaction_type=None):
+        """
+        Returns a queryset for all transactions recorded for a given course
+        """
+
+        if transaction_type:
+            return PaymentTransactionCourseMap.objects.filter(
+                course_id=course_key,
+                transaction__transaction_type=transaction_type
+            ).select_related()
+        else:
+            return PaymentTransactionCourseMap.objects.filter(
+                course_id=course_key
+            ).select_related()
+
+    @classmethod
+    def get_transaction_totals_for_course(cls, course_key):
+        """
+        Returns aggregates sums for a course grouped by transaction_type. The result set will look like:
+
+        {
+            'purchased': xx.xx,
+            'refunded': yyy.yy
+        }
+        """
+
+        results = {
+            'purchased': 0.0,
+            'refunded': 0.0
+        }
+
+        query = PaymentTransactionCourseMap.objects.filter(
+            course_id=course_key
+        ).select_related().values('transaction__transaction_type').order_by().annotate(total=Sum('transaction__amount'))
+
+        # translate the aggregated query into something more readible for the callers
+        for item in query:
+            total = item['total']
+            if item['transaction__transaction_type'] == TRANSACTION_TYPE_PURCHASE:
+                results['purchased'] = total
+            else:
+                results['refunded'] = total
+
+        return results
+
+@receiver(post_save, sender=PaymentProcessorTransaction)
+def post_transaction_save(sender, **kwargs):
+    """
+    Whenever we save a new PaymentProcessorTransaction, we should generate the mappings into
+    the PaymentProcessorTransactionCourseMap
+    """
+
+    if kwargs['created']:
+        transaction = kwargs['instance']
+
+        # go through all OrderItems and get all subclasses
+        order_items = OrderItem.objects.filter(order=transaction.order).select_subclasses()
+
+        for item in order_items:
+            if hasattr(item, 'course_id'):
+                course_map = PaymentTransactionCourseMap(
+                    transaction=transaction,
+                    course_id = getattr(item, 'course_id'),
+                    order_item = item
+                )
+                course_map.save()
 
 
-class CyberSourceTransactionCourseMap(models.Model):
+class PaymentTransactionCourseMap(models.Model):
     """
     This table is to facilitate quick querying for financial reporting.
     While this table does not expose any new information, it is non-performant to
-    map CyberSource transactions to CourseId's via the existing Order and OrderItem subclasses.
-    These are computed during synchronization-time to allow for quicker querying
+    map Payment Processor transactions to CourseId's via the existing Order and OrderItem subclasses.
+    These are computed during synchronization-time to allow for quicker querying and report
+    generation
     """
 
-    transaction = models.ForeignKey(CyberSourceTransaction)
+    transaction = models.ForeignKey(PaymentProcessorTransaction, db_index=True)
     course_id = CourseKeyField(max_length=255, db_index=True)
-    order_item = models.ForeignKey(OrderItem)
+    order_item = models.ForeignKey(OrderItem, db_index=True)
+
+    class Meta:  # pylint: disable=missing-docstring
+        unique_together = (('transaction', 'course_id', 'order_item'),)
 
 
-class CyberSourceTransactionSynchronization(TimeStampedModel):
+class PaymentTransactionSync(TimeStampedModel):
     """
     This model will store all synchronization activities when synchronizing the internal database
-    with CyberSource reporting. This table is managed by the synchronization management
+    with Payment Processor reporting. This table is managed by the synchronization management
     command
     """
 
