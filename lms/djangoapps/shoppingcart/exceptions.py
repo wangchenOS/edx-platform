@@ -63,3 +63,7 @@ class InvalidStatusToRetire(Exception):
 
 class UnexpectedOrderItemStatus(Exception):
     pass
+
+
+class OrderDoesNotExistException(Exception):
+    pass

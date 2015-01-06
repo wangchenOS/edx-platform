@@ -14,11 +14,11 @@ from boto.exception import BotoServerError  # this is a super-class of SESError 
 from django.dispatch import receiver
 from django.db import models, IntegrityError
 from django.conf import settings
-from django.core.exceptions import ObjectDoesNotExist
+from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.core.mail import send_mail
 from django.contrib.auth.models import User
 from django.utils.translation import ugettext as _
-from django.db.models.signals import post_save
+from django.db.models.signals import post_save, pre_save
 from django.db import transaction
 from django.db.models import Sum
 from django.core.urlresolvers import reverse
@@ -51,6 +51,7 @@ from .exceptions import (
     ItemNotAllowedToRedeemRegCodeException,
     InvalidStatusToRetire,
     UnexpectedOrderItemStatus,
+    OrderDoesNotExistException,
 )
 
 from microsite_configuration import microsite
@@ -1684,11 +1685,16 @@ class PaymentProcessorTransaction(TimeStampedModel):
         not support update cases
         """
 
+        try:
+            order = Order.objects.get(id=order_id)
+        except Order.DoesNotExist:
+            raise OrderDoesNotExistException
+
         transaction = PaymentProcessorTransaction(
             remote_transaction_id=remote_transaction_id,
             account_id=account_id,
             processed_at=processed_at,
-            order=Order.objects.get(id=order_id),
+            order=order,
             currency=currency,
             amount=amount,
             transaction_type=transaction_type
@@ -1712,25 +1718,31 @@ class PaymentProcessorTransaction(TimeStampedModel):
         return transaction
 
     @classmethod
-    def get_transactions_for_course(cls, course_key, transaction_type=None):
+    def get_transactions_for_course(cls, course_key, transaction_type=None, start=None, end=None):
         """
         Returns a queryset for all transactions recorded for a given course
         """
 
+        query = PaymentTransactionCourseMap.objects.filter(
+            course_id=course_key
+        ).select_related()
+
         if transaction_type:
-            return PaymentTransactionCourseMap.objects.filter(
-                course_id=course_key,
-                transaction__transaction_type=transaction_type
-            ).select_related()
-        else:
-            return PaymentTransactionCourseMap.objects.filter(
-                course_id=course_key
-            ).select_related()
+            query = query.filter(transaction__transaction_type=transaction_type)
+
+        # apply time filtering, if requested by caller
+        if start and end:
+            query = query.filter(transaction__processed_at__gte=start, transaction__processed_at__lte=end)
+
+        return query
 
     @classmethod
-    def get_transaction_totals_for_course(cls, course_key):
+    def get_transaction_totals_for_course(cls, course_key, start=None, end=None):
         """
-        Returns aggregates sums for a course grouped by transaction_type. The result set will look like:
+        Returns aggregates sums for a course grouped by transaction_type. The caller can specify an optional start/end date
+        to get time slices of the data
+
+        The result set will look like:
 
         {
             'purchased': xx.xx,
@@ -1745,7 +1757,13 @@ class PaymentProcessorTransaction(TimeStampedModel):
 
         query = PaymentTransactionCourseMap.objects.filter(
             course_id=course_key
-        ).select_related().values('transaction__transaction_type').order_by().annotate(total=Sum('transaction__amount'))
+        ).select_related()
+
+        # apply time filtering, if requested by caller
+        if start and end:
+            query = query.filter(transaction__processed_at__gte=start, transaction__processed_at__lte=end)
+
+        query = query.values('transaction__transaction_type').order_by().annotate(total=Sum('amount'))
 
         # translate the aggregated query into something more readible for the callers
         for item in query:
@@ -1757,11 +1775,46 @@ class PaymentProcessorTransaction(TimeStampedModel):
 
         return results
 
+    def validate(self):
+        """
+        Perform some validation regarding the transaction and how it matches our internal
+        database state
+        """
+
+        # 1: We should only have a transaction for a Order that has a status='purchased'
+        if self.order.status != 'purchased':
+            raise ValidationError('remote_transaction_id {} was received for order {} but it does not have a purchased status'.format(self.remote_transaction_id, self.order.id))
+
+        # 2: The transaction amount should be exactly the same as all OrderItems on the Order
+        # As we don't support partial payments or refunds
+        total = sum(i.line_cost for i in self.order.orderitem_set.all())
+
+        if self.transaction_type == TRANSACTION_TYPE_PURCHASE:
+            if self.amount != total:
+                raise ValidationError('remote_transaction_id {} has purchase amount of {} but Order {} has a sum of {}'.format(
+                    self.remote_transaction_id, self.amount, self.order.id, total
+                ))
+        elif self.transaction_type == TRANSACTION_TYPE_REFUND:
+            if self.amount != -total:
+                raise ValidationError('remote_transaction_id {} has refund amount of {} but Order {} has a sum of {}'.format(
+                    self.remote_transaction_id, self.amount, self.order.id, total
+                ))
+
+
+@receiver(pre_save, sender=PaymentProcessorTransaction)
+def pre_transaction_save(sender, **kwargs):
+    """
+    Do some assumption validation regarding transactions
+    """
+    transaction = kwargs['instance']
+    transaction.validate()
+
+
 @receiver(post_save, sender=PaymentProcessorTransaction)
 def post_transaction_save(sender, **kwargs):
     """
     Whenever we save a new PaymentProcessorTransaction, we should generate the mappings into
-    the PaymentProcessorTransactionCourseMap
+    the PaymentTransactionCourseMap
     """
 
     if kwargs['created']:
@@ -1775,7 +1828,12 @@ def post_transaction_save(sender, **kwargs):
                 course_map = PaymentTransactionCourseMap(
                     transaction=transaction,
                     course_id = getattr(item, 'course_id'),
-                    order_item = item
+                    order_item = item,
+                    # we can assume that the sum of all line items matches
+                    # the amount in the transaction as we
+                    # assert against that fact in the pre-save validation
+                    amount = item.line_cost if transaction.transaction_type == TRANSACTION_TYPE_PURCHASE else -item.line_cost,
+                    currency = transaction.currency
                 )
                 course_map.save()
 
@@ -1792,6 +1850,8 @@ class PaymentTransactionCourseMap(models.Model):
     transaction = models.ForeignKey(PaymentProcessorTransaction, db_index=True)
     course_id = CourseKeyField(max_length=255, db_index=True)
     order_item = models.ForeignKey(OrderItem, db_index=True)
+    currency = models.CharField(max_length=16)
+    amount = models.DecimalField(decimal_places=2, max_digits=30)
 
     class Meta:  # pylint: disable=missing-docstring
         unique_together = (('transaction', 'course_id', 'order_item'),)
@@ -1804,14 +1864,38 @@ class PaymentTransactionSync(TimeStampedModel):
     command
     """
 
-    # start date of extract (daily only)
+    # start date of extract
     date_range_start = models.DateTimeField(db_index=True)
 
     # end date of extract
     date_range_end = models.DateTimeField(db_index=True)
 
-    rows_extracted = models.IntegerField()
+    # how many rows received
+    row_received = models.IntegerField()
+
+    # how many rows were successfully synced
+    rows_processed = models.IntegerField()
+
+    # how many rows could not be processed due to errors
+    # there should be a corresponding entry in the PaymentTransactionSyncError table
+    rows_in_error = models.IntegerField()
 
     # the start and end Id numbers of the corresponding rows in CyberSourceTransaction
     start_transaction_id = models.IntegerField()
     end_transaction_id = models.IntegerField()
+
+    sync_started_at = models.DateTimeField(default=datetime.now(pytz.utc))
+    sync_ended_at = models.DateTimeField(null=True)
+
+
+class PaymentTransactionSyncError(TimeStampedModel):
+    """
+    This class records any exceptions/errors encountered while trying to synchronize the transactions
+    """
+    # The primary identifier for any transaction as stored in
+    # the payment processor.
+    remote_transaction_id = models.CharField(max_length=64, db_index=True, unique=True)
+
+    raw_data = models.TextField()
+
+    err_msg = models.TextField()
