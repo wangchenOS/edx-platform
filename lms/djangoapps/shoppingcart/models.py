@@ -1899,3 +1899,18 @@ class PaymentTransactionSyncError(TimeStampedModel):
     raw_data = models.TextField()
 
     err_msg = models.TextField()
+
+    @classmethod
+    def create_and_save(cls, remote_transaction_id, raw_data, err_msg):
+        """
+        Create and save a new Sync error
+        """
+
+        err = PaymentTransactionSyncError(
+            remote_transaction_id=remote_transaction_id,
+            raw_data=raw_data,
+            err_msg=err_msg
+        )
+
+        err.save()
+        return err

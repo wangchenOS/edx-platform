@@ -2,10 +2,12 @@
 """
 Tests for the newer CyberSource API implementation.
 """
-from mock import patch
+import datetime
+from mock import Mock, patch
 from django.test import TestCase
 from django.conf import settings
 import ddt
+from django.test.utils import override_settings
 
 from student.tests.factories import UserFactory
 from shoppingcart.models import Order, OrderItem
@@ -14,7 +16,10 @@ from shoppingcart.processors.CyberSource2 import (
     process_postpay_callback,
     render_purchase_form_html,
     get_signed_purchase_params,
-    _get_processor_exception_html
+    _get_processor_exception_html,
+    get_report_data_for_account,
+    get_report_data,
+    process_report_data,
 )
 from shoppingcart.processors.exceptions import (
     CCProcessorSignatureException,
@@ -398,3 +403,113 @@ class CyberSource2Test(TestCase):
                 in params['signed_field_names'].split(u",")
             ])
         )
+
+
+    MOCKED_REPORT_CSV_CONTENT = """header\n
+        batch_id,merchant_id, batch_date,request_id,merchant_ref_number,trans_ref_no,payment_method,currency,amount,transaction_type\n
+        1, foo_account, 01/01/15, 1, 1, 1, Visa, USD, 10, ics_bill\n
+        2, foo_account, 01/01/15, 1, 2, 2, Visa, USD, 20.50, ics_bill\n
+        3, foo_account, 01/01/15, 1, 3, 3, Visa, USD, 60, ics_bill\n
+        4, foo_account, 01/01/15, 1, 1, 4, Visa, USD, 10, ics_credit"""
+
+    def test_get_report_data_for_account(self):
+        """
+        This test mocks out the CyberSource PaymentBatchDetailReport and see if it operates as expected
+        """
+
+        with patch('shoppingcart.processors.CyberSource2.requests') as mock_requests:
+            mock_requests.get.return_value = mock_response = Mock()
+            mock_response.status_code = 200
+            mock_response.content = self.MOCKED_REPORT_CSV_CONTENT
+
+
+            data = get_report_data_for_account(
+                'foo_account',
+                {
+                    'REPORTING_BASE_ENDPOINT': 'https://rogus.mcbogus.com/',
+                    'REPORTING_AUTH_USERNAME': 'foo',
+                    'REPORTING_AUTH_PASSWORD': 'bar',
+                },
+                datetime.datetime.now()
+            )
+
+            self.assertEqual(len(data), 4)
+
+    TEST_REPORTING_CC_PROCESSOR_NAME = "CyberSource2"
+    TEST_REPORTING_CC_PROCESSOR = {
+        'CyberSource2': {
+            "REPORTING_BASE_ENDPOINT": "dummy",
+            "REPORTING_ACCOUNT_NAME": "first",
+            "REPORTING_AUTH_USERNAME": "dummy",
+            "REPORTING_AUTH_PASSWORD": "dummy",
+            "microsites" : {
+                'foo': {
+                    "REPORTING_BASE_ENDPOINT": "dummy",
+                    "REPORTING_ACCOUNT_NAME": "second",
+                    "REPORTING_AUTH_USERNAME": "dummy",
+                    "REPORTING_AUTH_PASSWORD": "dummy",
+                },
+                'bar': {
+                    "REPORTING_BASE_ENDPOINT": "dummy",
+                    # intentionally have two microsites that point
+                    # to the same account_name
+                    "REPORTING_ACCOUNT_NAME": "second",
+                    "REPORTING_AUTH_USERNAME": "dummy",
+                    "REPORTING_AUTH_PASSWORD": "dummy",
+                },
+            }
+        }
+    }
+
+    @override_settings(
+        CC_PROCESSOR_NAME=TEST_REPORTING_CC_PROCESSOR_NAME,
+        CC_PROCESSOR=TEST_REPORTING_CC_PROCESSOR
+    )
+    def test_get_report_data(self):
+        """
+        This verifies getting report data over all accounts defined in the configuration
+        """
+
+        with patch('shoppingcart.processors.CyberSource2.requests') as mock_requests:
+            mock_requests.get.return_value = mock_response = Mock()
+            mock_response.status_code = 200
+            mock_response.content = self.MOCKED_REPORT_CSV_CONTENT
+
+            data = get_report_data(datetime.datetime.now())
+
+            # this should be 8 because we are fetching the same mocked out data twice
+            # once for the root and the other for a microsite. Note there are two
+            # microsites, but they are defined to use the same account (so it shouldn'e be 12)
+            self.assertEqual(len(data), 8)
+
+    def test_process_report_data_no_orders(self):
+        """
+        This will verify processing data that contains errors (missing Orders)
+        """
+
+        test_data = [
+            {
+                'merchant_id': 'foo',
+                'batch_date': '1/2/15',
+                'merchant_ref_number': '1000',
+                'currency': 'USD',
+                'amount': '100',
+                'type': 'ics_bill',
+                'trans_ref_no': '100',
+            },
+            {
+                'merchant_id': 'foo',
+                'batch_date': '1/2/15',
+                'merchant_ref_number': '1001',
+                'currency': 'USD',
+                'amount': '20.50',
+                'type': 'ics_bill',
+                'trans_ref_no': '101',
+            },
+        ]
+
+        num_processed, num_in_err, errors = process_report_data(test_data)
+
+        self.assertEqual(num_processed, 0)
+        self.assertEqual(num_in_err, 2)
+        self.assertEqual(len(errors), 2)

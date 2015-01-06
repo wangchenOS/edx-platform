@@ -437,3 +437,9 @@ REASONCODE_MAP.update(
             """)),
     }
 )
+
+def sychronize_transactions(start_date, end_date):
+    """
+    Concrete implementation of the API
+    """
+    raise Exception("Not implemented")
