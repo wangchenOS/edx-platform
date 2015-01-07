@@ -118,6 +118,7 @@
       display: block;
 
       img {
+        height: 48px;
         display: block;
       }
     }
@@ -236,7 +237,6 @@
   }
 
   .branding {
-    width: 20%;
     @include margin-right(2%);
   }
 
@@ -261,7 +261,6 @@
     }
 
     .branding {
-      width: 20%;
       @include margin-right(2%);
     }
 
