@@ -27,6 +27,7 @@ http://${site}/account/email/confirmation/${key}
 ${_("If you don't want to change the email address associated with your "
   "account, ignore this message.")}
 
-## Farewell
-${_("Thanks,")}
-${_("- The edX Team")}
+## Translators: This is the signature of an email
+${_("Thanks,\n - The {platform_name} Team").format(
+  platform_name=settings.PLATFORM_NAME,
+)}

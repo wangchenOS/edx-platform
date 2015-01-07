@@ -14,6 +14,7 @@ ${_("You successfully changed the email address associated with your "
     )
 }
 
-## Farewell
-${_("Thanks,")}
-${_("- The edX Team")}
+## Translators: This is the signature of an email
+${_("Thanks,\n - The {platform_name} Team").format(
+  platform_name=settings.PLATFORM_NAME,
+)}
