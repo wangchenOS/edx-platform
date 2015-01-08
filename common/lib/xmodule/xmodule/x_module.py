@@ -201,7 +201,7 @@ class HTMLSnippet(object):
         js = cls.js.setdefault('js', [])
 
         # Added xmodule.js separately to enforce 000 prefix for this only.
-        xmodule_js = cls.js.setdefault('xmodule_js', resource_string(__name__, 'js/src/xmodule.js'))
+        cls.js.setdefault('xmodule_js', resource_string(__name__, 'js/src/xmodule.js'))
 
         return cls.js
 
